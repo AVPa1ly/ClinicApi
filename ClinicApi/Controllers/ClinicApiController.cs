@@ -1,10 +1,12 @@
 ﻿using AutoMapper;
 using ClinicApi.Data;
+using ClinicApi.Entities;
 using ClinicApi.Models;
 using ClinicApi.Models.Dto;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 namespace ClinicApi.Controllers
 {
@@ -13,10 +15,12 @@ namespace ClinicApi.Controllers
     public class ClinicApiController : ControllerBase
     {
         private readonly ApplicationDbContext _db;
+        private readonly IConfiguration _config;
 
-        public ClinicApiController(ApplicationDbContext db)
+        public ClinicApiController(ApplicationDbContext db, IConfiguration config)
         {
             _db = db;
+            _config = config;
         }
 
         /// <summary>
@@ -29,9 +33,9 @@ namespace ClinicApi.Controllers
         [HttpGet("{id:guid}", Name = "GetPatient")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<PatientDto> GetPatient(Guid id)
+        public async Task<ActionResult<PatientDto>> GetPatient(Guid id)
         {
-            var patient = _db.Patients.FirstOrDefault(x => x.Id == id);
+            var patient = await _db.Patients.FirstOrDefaultAsync(x => x.Id == id);
 
             if (patient is null)
             {
@@ -41,6 +45,45 @@ namespace ClinicApi.Controllers
             var patientDto = ConvertToDto(patient);
 
             return Ok(patientDto);
+        }
+
+        /// <summary>
+        /// Get PatientDtos by Date/Datetime intervals, matching the criteria
+        /// </summary>
+        /// <remarks>
+        /// See <a href='https://www.hl7.org/fhir/search.html#date'>HERE</a> for date processing rules
+        /// </remarks>
+        /// <param name="date">Array of strings with prefixed Date/DateTime</param>
+        /// <returns></returns>
+        /// <response code="200">Success</response>
+        /// <response code="404">No records found</response>
+        /// <response code="400">Wrong argument(s)</response>
+        [HttpGet(Name = "GetPatientByDateTimes")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<PatientDto>> GetPatientByDateTimes([FromQuery]string[] date)
+        {
+            var query = _db.Patients.Select(x => x);
+            try
+            {
+                query = date.Aggregate(query, (current, d) => DateExpressionConverter.Convert(d, current));
+                var patients = await query.ToListAsync();
+
+                if (patients.IsNullOrEmpty())
+                {
+                    return NotFound();
+                }
+
+                var patientDtos = new List<PatientDto>(patients.Capacity);
+                patientDtos.AddRange(patients.Select(ConvertToDto));
+
+                return Ok(patientDtos);
+            }
+            catch (ArgumentException e)
+            {
+                return BadRequest(e.Message);
+            }
         }
 
         /// <summary>
@@ -74,12 +117,12 @@ namespace ClinicApi.Controllers
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<PatientDto> CreatePatient([FromBody]PatientDto patientDto)
+        public async Task<ActionResult<PatientDto>> CreatePatient([FromBody]PatientDto patientDto)
         {
-            var existingNameId = _db.Patients
+            var existingNameId = await _db.Patients
                 .Where(x => x.Id == patientDto.Name.Id)
                 .Select(p => p.Id)
-                .SingleOrDefault();
+                .SingleOrDefaultAsync();
 
             if (existingNameId != Guid.Empty)
             {
@@ -87,14 +130,14 @@ namespace ClinicApi.Controllers
                 return BadRequest(ModelState);
             }
 
-            if (!GenderValidator.GenderIsValid(patientDto.Gender))
+            if (!GenderValidator.GenderIsValid(patientDto.Gender, _config))
             {
                 return InvalidGenreBadRequest();
             }
 
             var patient = ConvertFromDto(patientDto);
-            _db.Add(patient);
-            _db.SaveChanges();
+            await _db.AddAsync(patient);
+            await _db.SaveChangesAsync();
 
             return CreatedAtRoute("GetPatient", new { id = patientDto.Name.Id }, patientDto);
         }
@@ -109,9 +152,9 @@ namespace ClinicApi.Controllers
         [HttpDelete("{id:guid}", Name = "DeletePatient")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult DeletePatient(Guid id)
+        public async Task<IActionResult> DeletePatient(Guid id)
         {
-            var patient = _db.Patients.FirstOrDefault(x => x.Id == id);
+            var patient = await _db.Patients.FirstOrDefaultAsync(x => x.Id == id);
 
             if (patient is null)
             {
@@ -119,7 +162,7 @@ namespace ClinicApi.Controllers
             }
 
             _db.Patients.Remove(patient);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
             return NoContent();
         }
 
@@ -135,15 +178,15 @@ namespace ClinicApi.Controllers
         ///             {
         ///                "id": "d8ff176f-bd0a-4b8e-b329-871952e32e1f",
         ///                "use": "official",
-        ///                "family": "Иванов",
+        ///                "family": "Сергеев",
         ///                "given": [
-        ///                    "Иван",
-        ///                    "Иванович",
+        ///                    "Сергей",
+        ///                    "Сергеевич",
         ///                ]
         ///             }, 
-        ///        "gender": "male",
-        ///        "birthdate": "2024-09-16T23:13:51",
-        ///        "active": true
+        ///        "gender": "unknown",
+        ///        "birthdate": "2024-05-14T18:25:43",
+        ///        "active": false
         ///     }
         /// 
         /// </remarks>
@@ -154,14 +197,14 @@ namespace ClinicApi.Controllers
         [HttpPut(Name = "UpdatePatient")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult UpdatePatient([FromBody]PatientDto patientDto)
+        public async Task<IActionResult> UpdatePatient([FromBody]PatientDto patientDto)
         {
-            if (!GenderValidator.GenderIsValid(patientDto.Gender))
+            if (!GenderValidator.GenderIsValid(patientDto.Gender, _config))
             {
                 return InvalidGenreBadRequest();
             }
 
-            var retrievedPatient = _db.Patients.FirstOrDefault(x => x.Id == patientDto.Name.Id);
+            var retrievedPatient = await _db.Patients.FirstOrDefaultAsync(x => x.Id == patientDto.Name.Id);
 
             if (retrievedPatient is null)
             {
@@ -172,7 +215,7 @@ namespace ClinicApi.Controllers
 
             _db.Attach(retrievedPatient);
             _db.Entry(retrievedPatient).CurrentValues.SetValues(newPatientData);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
             return NoContent();
         }
 
@@ -180,7 +223,7 @@ namespace ClinicApi.Controllers
         /// Patches patient record
         /// </summary>
         /// <remarks>
-        /// See https://jsonpatch.com/.
+        /// See <a href='https://jsonpatch.com/'>HERE</a> for PATCH request details
         /// 
         /// Request example:
         /// 
@@ -192,16 +235,17 @@ namespace ClinicApi.Controllers
         ///     }
         /// 
         /// </remarks>
-        /// <param name="patientDto">PatientDto</param>
+        /// <param name="id">Guid</param>
+        /// <param name="patchDto">PatchDto</param>
         /// <returns></returns>
         /// <response code="204">Successfully patched</response>
         /// <response code="400">API Error</response>
         [HttpPatch("{id:guid}", Name = "UpdatePartialPatient")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult UpdatePartialPatient(Guid id, JsonPatchDocument<PatientDto> patchDto)
+        public async Task<IActionResult> UpdatePartialPatient(Guid id, JsonPatchDocument<PatientDto> patchDto)
         {
-            var patient = _db.Patients.AsNoTracking().FirstOrDefault(x => x.Id == id);
+            var patient = await _db.Patients.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
 
             if (patient is null)
             {
@@ -218,8 +262,13 @@ namespace ClinicApi.Controllers
 
             var patientUpdated = ConvertFromDto(patientDto);
 
+            if (!GenderValidator.GenderIsValid(patientUpdated.Gender, _config))
+            {
+                return InvalidGenreBadRequest();
+            }
+
             _db.Update(patientUpdated);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
 
             return NoContent();
         }

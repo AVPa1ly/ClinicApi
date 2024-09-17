@@ -1,0 +1,8 @@
+{
+  "allowedUseValues": [
+    "male",
+    "female",
+    "other",
+    "unknown"
+  ]
+}

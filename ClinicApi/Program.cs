@@ -18,6 +18,10 @@ builder.Services.AddSwaggerGen(options =>
     options.IncludeXmlComments(xmlPath);
 });
 
+builder.Configuration.AddJsonFile("config.json",
+    optional: true,
+    reloadOnChange: true);
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

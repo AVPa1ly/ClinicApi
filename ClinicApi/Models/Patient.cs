@@ -2,7 +2,7 @@
 
 namespace ClinicApi.Models
 {
-    public class Patient
+    public class Patient : IDate
     {
         [Key]
         public Guid Id { get; set; }
