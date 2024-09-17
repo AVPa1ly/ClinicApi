@@ -1,7 +1,5 @@
-﻿using AutoMapper;
-using ClinicApi.Data;
+﻿using ClinicApi.Data;
 using ClinicApi.Entities;
-using ClinicApi.Models;
 using ClinicApi.Models.Dto;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
@@ -42,7 +40,7 @@ namespace ClinicApi.Controllers
                 return NotFound();
             }
             
-            var patientDto = ConvertToDto(patient);
+            var patientDto = PatientConverter.ConvertToDto(patient);
 
             return Ok(patientDto);
         }
@@ -76,7 +74,7 @@ namespace ClinicApi.Controllers
                 }
 
                 var patientDtos = new List<PatientDto>(patients.Capacity);
-                patientDtos.AddRange(patients.Select(ConvertToDto));
+                patientDtos.AddRange(patients.Select(PatientConverter.ConvertToDto));
 
                 return Ok(patientDtos);
             }
@@ -135,7 +133,7 @@ namespace ClinicApi.Controllers
                 return InvalidGenreBadRequest();
             }
 
-            var patient = ConvertFromDto(patientDto);
+            var patient = PatientConverter.ConvertFromDto(patientDto);
             await _db.AddAsync(patient);
             await _db.SaveChangesAsync();
 
@@ -211,7 +209,7 @@ namespace ClinicApi.Controllers
                 return BadRequest();
             }
 
-            var newPatientData = ConvertFromDto(patientDto);
+            var newPatientData = PatientConverter.ConvertFromDto(patientDto);
 
             _db.Attach(retrievedPatient);
             _db.Entry(retrievedPatient).CurrentValues.SetValues(newPatientData);
@@ -252,7 +250,7 @@ namespace ClinicApi.Controllers
                 return BadRequest();
             }
 
-            var patientDto = ConvertToDto(patient);
+            var patientDto = PatientConverter.ConvertToDto(patient);
             patchDto.ApplyTo(patientDto, ModelState);
 
             if (!ModelState.IsValid)
@@ -260,7 +258,7 @@ namespace ClinicApi.Controllers
                 return BadRequest(ModelState);
             }
 
-            var patientUpdated = ConvertFromDto(patientDto);
+            var patientUpdated = PatientConverter.ConvertFromDto(patientDto);
 
             if (!GenderValidator.GenderIsValid(patientUpdated.Gender, _config))
             {
@@ -271,33 +269,6 @@ namespace ClinicApi.Controllers
             await _db.SaveChangesAsync();
 
             return NoContent();
-        }
-
-        private static Patient ConvertFromDto(PatientDto patientDto)
-        {
-            var config = new MapperConfiguration(cfg => cfg.CreateMap<PatientDto, Patient>()
-                .ForMember("Id", opt => opt.MapFrom(src => src.Name.Id))
-                .ForMember("Use", opt => opt.MapFrom(src => src.Name.Use))
-                .ForMember("Family", opt => opt.MapFrom(src => src.Name.Family))
-                .ForMember("FirstName", opt => opt.MapFrom(src => src.Name.Given.FirstOrDefault()))
-                .ForMember("MiddleName", opt => opt.MapFrom(src => src.Name.Given.LastOrDefault())));
-            var mapper = new Mapper(config);
-            return mapper.Map<PatientDto, Patient>(patientDto);
-        }
-
-        private static PatientDto ConvertToDto(Patient patient)
-        {
-            var config = new MapperConfiguration(cfg =>
-            {
-                cfg.CreateMap<Patient, NameDto>()
-                    .ForMember("Given", opt => opt.MapFrom(
-                        src => new [] { src.FirstName, src.MiddleName }));
-                cfg.CreateMap<Patient, PatientDto>()
-                    .ForMember(dest => dest.Name, opt =>
-                        opt.MapFrom(src => src));
-            });
-            var mapper = new Mapper(config);
-            return mapper.Map<Patient, PatientDto>(patient);
         }
 
         private BadRequestObjectResult InvalidGenreBadRequest()

@@ -1,7 +1,7 @@
 {
 	"info": {
 		"_postman_id": "31fd1c64-124c-4dfd-ad33-4f501f0d8561",
-		"name": "Clinic API Test",
+		"name": "Clinic API",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "27339780"
 	},
@@ -65,19 +65,19 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}?date=gt2023-02-20&date=lt2023-03-11",
+							"raw": "{{base_url}}?date=gt2024-02-20&date=lt2024-03-11",
 							"host": [
 								"{{base_url}}"
 							],
 							"query": [
 								{
 									"key": "date",
-									"value": "gt2023-02-20",
+									"value": "gt2024-02-20",
 									"description": "Upper bound"
 								},
 								{
 									"key": "date",
-									"value": "lt2023-03-11",
+									"value": "lt2024-03-11",
 									"description": "Lower bound"
 								}
 							]
@@ -142,14 +142,14 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}?date=gt2025",
+							"raw": "{{base_url}}?date=gt2125",
 							"host": [
 								"{{base_url}}"
 							],
 							"query": [
 								{
 									"key": "date",
-									"value": "gt2025",
+									"value": "gt2125",
 									"description": "No data found"
 								}
 							]
