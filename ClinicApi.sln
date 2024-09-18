@@ -5,7 +5,7 @@ VisualStudioVersion = 17.10.35027.167
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClinicApi", "ClinicApi\ClinicApi.csproj", "{DF202C32-C5F9-4EDA-8AE7-07C7A01BF93C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestPostRequests", "TestPutRequests\TestPostRequests.csproj", "{D27CBFBE-F03F-49B3-BC8F-A41A8AF7741D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestPostRequests", "TestPostRequests\TestPostRequests.csproj", "{D27CBFBE-F03F-49B3-BC8F-A41A8AF7741D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
