@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  clinicapi:
+    container_name: clinicapi-container
+    image: avpa1ly/clinicapi
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - MSSQL_SA_PASSWORD=Password1!
+    ports:
+      - "7076:8080"
+    depends_on:
+      - sqlserver    
+  sqlserver:
+    container_name: sqlserver-container
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=Password1!
+    ports:
+      - "1433:1433"

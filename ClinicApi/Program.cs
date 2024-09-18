@@ -6,7 +6,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddDbContext<ApplicationDbContext>(option =>
 {
-    option.UseSqlServer(builder.Configuration.GetConnectionString("DefaultSQLConnection"));
+    var connectionString = builder.Configuration.GetConnectionString("DefaultSQLConnection");
+    if (!builder.Environment.IsDevelopment())
+    {
+        var password = Environment.GetEnvironmentVariable("MSSQL_SA_PASSWORD");
+        connectionString = string.Format(connectionString, password);
+    }
+    option.UseSqlServer(connectionString);
+
 });
 builder.Services.AddControllers().AddNewtonsoftJson();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -36,5 +43,11 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    db.Database.Migrate();
+}
 
 app.Run();
